@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Zap, Minimize2, Maximize2 } from 'lucide-react';
 
-export default function EnergyGraph({ telemetry }) {
+export default function EnergyGraph({ telemetry, isMobileSheet = false }) {
   const canvasRef = useRef(null);
   const historyRef = useRef([]);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -25,6 +25,10 @@ export default function EnergyGraph({ telemetry }) {
     // Render Canvas
     const canvas = canvasRef.current;
     if (!canvas || isMinimized) return;
+
+    if (canvas.clientWidth > 0 && Math.abs(canvas.width - canvas.clientWidth) > 5) {
+      canvas.width = canvas.clientWidth;
+    }
 
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
@@ -93,7 +97,7 @@ export default function EnergyGraph({ telemetry }) {
   }, [telemetry, isMinimized]);
 
   return (
-    <div className={`energy-graph-card glass-panel ${isMinimized ? 'minimized' : ''}`}>
+    <div className={`energy-graph-card ${isMobileSheet ? 'mobile-sheet-content' : 'glass-panel'} ${!isMobileSheet && isMinimized ? 'minimized' : ''}`}>
       <div className="energy-header">
         <div className="flex items-center gap-2">
           <Zap size={15} className="text-amber-400" />
@@ -101,16 +105,18 @@ export default function EnergyGraph({ telemetry }) {
             Orbital Energy Conservation
           </span>
         </div>
-        <button
-          className="icon-subtle-btn"
-          onClick={() => setIsMinimized(!isMinimized)}
-          title={isMinimized ? "Show Graph" : "Hide Graph"}
-        >
-          {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
-        </button>
+        {!isMobileSheet && (
+          <button
+            className="icon-subtle-btn"
+            onClick={() => setIsMinimized(!isMinimized)}
+            title={isMinimized ? "Show Graph" : "Hide Graph"}
+          >
+            {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
+          </button>
+        )}
       </div>
 
-      {!isMinimized && (
+      {(!isMinimized || isMobileSheet) && (
         <>
           <div className="energy-legend">
             <span className="legend-item"><span className="legend-dot bg-cyan-400"></span>Total (E) = Const</span>

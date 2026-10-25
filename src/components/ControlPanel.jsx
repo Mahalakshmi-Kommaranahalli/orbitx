@@ -39,7 +39,8 @@ export default function ControlPanel({
   onCaptureKeplerSector,
   onResetSimulation,
   isSandboxMode,
-  setIsSandboxMode
+  setIsSandboxMode,
+  isMobileSheet = false
 }) {
   const [activeTab, setActiveTab] = useState('presets'); // 'presets' | 'thrusters' | 'body' | 'display'
   const [deltaVMagnitude, setDeltaVMagnitude] = useState(0.5); // km/s
@@ -51,28 +52,32 @@ export default function ControlPanel({
     : null;
 
   return (
-    <div className={`control-panel-container glass-panel ${isCollapsed ? 'collapsed' : ''}`}>
-      {/* Collapse Toggle Handle */}
-      <button
-        className="collapse-handle-btn"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        title={isCollapsed ? "Expand Control Panel" : "Collapse Control Panel"}
-      >
-        {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-      </button>
+    <div className={`control-panel-container ${isMobileSheet ? 'mobile-sheet-content' : 'glass-panel'} ${!isMobileSheet && isCollapsed ? 'collapsed' : ''}`}>
+      {/* Collapse Toggle Handle for desktop */}
+      {!isMobileSheet && (
+        <button
+          className="collapse-handle-btn"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          title={isCollapsed ? "Expand Control Panel" : "Collapse Control Panel"}
+        >
+          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
+      )}
 
-      {!isCollapsed && (
+      {(!isCollapsed || isMobileSheet) && (
         <div className="panel-inner-content">
           {/* Logo / Header */}
-          <div className="panel-brand">
-            <div className="brand-logo-glow">
-              <Rocket size={22} className="text-cyan-400" />
+          {!isMobileSheet && (
+            <div className="panel-brand">
+              <div className="brand-logo-glow">
+                <Rocket size={22} className="text-cyan-400" />
+              </div>
+              <div>
+                <h1 className="brand-title">ORBITX</h1>
+                <p className="brand-tagline">Orbital Mechanics Physics Engine</p>
+              </div>
             </div>
-            <div>
-              <h1 className="brand-title">ORBITX</h1>
-              <p className="brand-tagline">Orbital Mechanics Physics Engine</p>
-            </div>
-          </div>
+          )}
 
           {/* Navigation Tabs */}
           <div className="panel-tabs">

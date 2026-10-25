@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { formatTime } from '../physics/orbitalMath';
 
-export default function TelemetryHUD({ telemetry, craftMass = 1000 }) {
+export default function TelemetryHUD({ telemetry, craftMass = 1000, isMobileSheet = false }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   if (!telemetry) return null;
@@ -41,7 +41,7 @@ export default function TelemetryHUD({ telemetry, craftMass = 1000 }) {
   const circRatio = vEsc > 0 ? (vCirc / vEsc) * 100 : 70.7;
 
   return (
-    <div className={`telemetry-hud-card glass-panel ${isExpanded ? 'expanded' : 'collapsed'}`}>
+    <div className={`telemetry-hud-card ${isMobileSheet ? 'mobile-sheet-content' : 'glass-panel'} ${!isMobileSheet && !isExpanded ? 'collapsed' : 'expanded'}`}>
       {/* HUD Header */}
       <div className="telemetry-header">
         <div className="telemetry-title-group">
@@ -54,13 +54,15 @@ export default function TelemetryHUD({ telemetry, craftMass = 1000 }) {
             {orbitType}
           </span>
         </div>
-        <button
-          className="hud-toggle-btn"
-          onClick={() => setIsExpanded(!isExpanded)}
-          title={isExpanded ? "Collapse HUD" : "Expand HUD"}
-        >
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
+        {!isMobileSheet && (
+          <button
+            className="hud-toggle-btn"
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={isExpanded ? "Collapse HUD" : "Expand HUD"}
+          >
+            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        )}
       </div>
 
       {/* Main Velocity & Altitude readout */}

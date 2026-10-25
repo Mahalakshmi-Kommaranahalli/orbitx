@@ -1,4 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Play,
+  Pause,
+  SkipForward,
+  RotateCcw,
+  Sliders,
+  Activity,
+  Zap,
+  BookOpen,
+  Trophy,
+  HelpCircle,
+  X,
+  Camera,
+  Flame,
+  RotateCw
+} from 'lucide-react';
 import OrbitCanvas from './components/OrbitCanvas';
 import ControlPanel from './components/ControlPanel';
 import TelemetryHUD from './components/TelemetryHUD';
@@ -44,6 +60,17 @@ export default function App() {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isThrusting, setIsThrusting] = useState(false);
   const [collisionWarning, setCollisionWarning] = useState(false);
+  const [mobileSheet, setMobileSheet] = useState(null); // null | 'controls' | 'telemetry' | 'energy' | 'formulas'
+  const [lastBurnDeltaV, setLastBurnDeltaV] = useState(0);
+  const [burnCount, setBurnCount] = useState(0);
+  const [achievementToast, setAchievementToast] = useState(null);
+
+  const handleAchievementUnlocked = (achievement) => {
+    setAchievementToast(achievement);
+    setTimeout(() => {
+      setAchievementToast((curr) => (curr?.id === achievement.id ? null : curr));
+    }, 4500);
+  };
 
   // References for Animation & Physics Loop
   const simStateRef = useRef({
@@ -224,6 +251,8 @@ export default function App() {
     const newVel = applyImpulse(sim.craftPos, sim.craftVel, burnType, deltaV);
     sim.craftVel = newVel;
     setCraftState((prev) => ({ ...prev, vel: newVel }));
+    setLastBurnDeltaV(deltaV);
+    setBurnCount((prev) => prev + 1);
 
     // Thruster firing animation trigger
     setIsThrusting(true);
@@ -244,6 +273,7 @@ export default function App() {
 
     sim.craftVel = newVel;
     setCraftState((prev) => ({ ...prev, vel: newVel }));
+    setBurnCount((prev) => prev + 1);
 
     setIsThrusting(true);
     setTimeout(() => setIsThrusting(false), 450);
@@ -311,6 +341,20 @@ export default function App() {
     setCollisionWarning(false);
   };
 
+  const warpPresets = [0.25, 0.5, 1, 2, 5, 10, 25, 50];
+  const handleCycleWarp = () => {
+    const currentIndex = warpPresets.indexOf(timeWarp);
+    const nextIndex = (currentIndex + 1) % warpPresets.length;
+    setTimeWarp(warpPresets[nextIndex]);
+  };
+
+  const cameraModes = ['free', 'top_down', 'follow_craft'];
+  const handleCycleCameraMode = () => {
+    const currentIndex = cameraModes.indexOf(cameraMode);
+    const nextIndex = (currentIndex + 1) % cameraModes.length;
+    setCameraMode(cameraModes[nextIndex]);
+  };
+
   return (
     <div className="orbitx-app-wrapper">
       {/* 3D WebGL Three.js Canvas */}
@@ -334,68 +378,360 @@ export default function App() {
       {/* Collision Warning Banner */}
       {collisionWarning && (
         <div className="collision-banner">
-          ⚠️ <strong>Atmospheric Re-entry / Surface Impact!</strong> Spacecraft collided with {centralBodyConfig.name}'s surface. Reset or adjust altitude.
+          ⚠️ <strong>Surface Impact!</strong> Spacecraft collided with {centralBodyConfig.name}'s surface. Reset or adjust altitude.
         </div>
       )}
 
-      {/* Left Dock: Interactive Control Panel */}
-      <ControlPanel
-        activePresetId={activePresetId}
-        onSelectPreset={handleSelectPreset}
-        centralBodyConfig={centralBodyConfig}
-        onUpdateCentralBody={setCentralBodyConfig}
-        craftState={craftState}
-        onApplyBurn={handleApplyBurn}
-        onCircularize={handleCircularize}
-        showVectors={showVectors}
-        setShowVectors={setShowVectors}
-        showConicPath={showConicPath}
-        setShowConicPath={setShowConicPath}
-        showHistoricalTrail={showHistoricalTrail}
-        setShowHistoricalTrail={setShowHistoricalTrail}
-        showDistanceRings={showDistanceRings}
-        setShowDistanceRings={setShowDistanceRings}
-        showKeplerSectors={showKeplerSectors}
-        setShowKeplerSectors={setShowKeplerSectors}
-        onCaptureKeplerSector={handleCaptureKeplerSector}
-        onResetSimulation={handleReset}
-        isSandboxMode={isSandboxMode}
-        setIsSandboxMode={setIsSandboxMode}
-      />
+      {/* Desktop Docks (hidden on phone via CSS @media) */}
+      <div className="desktop-docks-container">
+        <ControlPanel
+          activePresetId={activePresetId}
+          onSelectPreset={handleSelectPreset}
+          centralBodyConfig={centralBodyConfig}
+          onUpdateCentralBody={setCentralBodyConfig}
+          craftState={craftState}
+          onApplyBurn={handleApplyBurn}
+          onCircularize={handleCircularize}
+          showVectors={showVectors}
+          setShowVectors={setShowVectors}
+          showConicPath={showConicPath}
+          setShowConicPath={setShowConicPath}
+          showHistoricalTrail={showHistoricalTrail}
+          setShowHistoricalTrail={setShowHistoricalTrail}
+          showDistanceRings={showDistanceRings}
+          setShowDistanceRings={setShowDistanceRings}
+          showKeplerSectors={showKeplerSectors}
+          setShowKeplerSectors={setShowKeplerSectors}
+          onCaptureKeplerSector={handleCaptureKeplerSector}
+          onResetSimulation={handleReset}
+          isSandboxMode={isSandboxMode}
+          setIsSandboxMode={setIsSandboxMode}
+        />
+        <TelemetryHUD telemetry={telemetry} craftMass={craftState.mass} />
+        <EnergyGraph telemetry={telemetry} />
+        <FormulaInspector
+          telemetry={telemetry}
+          centralBodyConfig={centralBodyConfig}
+          craftMass={craftState.mass}
+        />
+        <TimeControls
+          isPlaying={isPlaying}
+          setIsPlaying={setIsPlaying}
+          timeWarp={timeWarp}
+          setTimeWarp={setTimeWarp}
+          onStepForward={handleStepForward}
+          onReset={handleReset}
+          onClearTrails={handleClearTrails}
+          cameraMode={cameraMode}
+          setCameraMode={setCameraMode}
+          onOpenChallenges={() => setIsChallengesOpen(true)}
+          onOpenGuide={() => setIsGuideOpen(true)}
+        />
+      </div>
 
-      {/* Top Right: Telemetry HUD */}
-      <TelemetryHUD telemetry={telemetry} craftMass={craftState.mass} />
+      {/* Mobile Top Header (Phone only) */}
+      <header className="mobile-top-bar glass-panel">
+        <div className="mobile-brand">
+          <span className="mobile-brand-dot pulse-emerald"></span>
+          <span className="mobile-brand-title">ORBITX</span>
+        </div>
 
-      {/* Center Right: Energy Graph */}
-      <EnergyGraph telemetry={telemetry} />
+        {telemetry && (
+          <button
+            className="mobile-orbit-badge"
+            style={{
+              borderColor: telemetry.orbitBadgeColor,
+              color: telemetry.orbitBadgeColor,
+              backgroundColor: `${telemetry.orbitBadgeColor}18`
+            }}
+            onClick={() => setMobileSheet('telemetry')}
+            title="View Telemetry"
+          >
+            {telemetry.orbitType}
+          </button>
+        )}
 
-      {/* Bottom Right: Interactive Formula Inspector Lab */}
-      <FormulaInspector
-        telemetry={telemetry}
-        centralBodyConfig={centralBodyConfig}
-        craftMass={craftState.mass}
-      />
+        <div className="mobile-top-actions">
+          <button
+            className="mobile-top-btn"
+            onClick={handleCycleCameraMode}
+            title={`Camera: ${cameraMode === 'free' ? '3D Orbit' : cameraMode === 'top_down' ? '2D Plane' : 'Follow Craft'}`}
+          >
+            <Camera size={15} />
+            <span className="mobile-cam-text">
+              {cameraMode === 'free' ? '3D' : cameraMode === 'top_down' ? '2D' : 'Chase'}
+            </span>
+          </button>
 
-      {/* Bottom Dock: Time & Camera Controls Bar */}
-      <TimeControls
-        isPlaying={isPlaying}
-        setIsPlaying={setIsPlaying}
-        timeWarp={timeWarp}
-        setTimeWarp={setTimeWarp}
-        onStepForward={handleStepForward}
-        onReset={handleReset}
-        onClearTrails={handleClearTrails}
-        cameraMode={cameraMode}
-        setCameraMode={setCameraMode}
-        onOpenChallenges={() => setIsChallengesOpen(true)}
-        onOpenGuide={() => setIsGuideOpen(true)}
-      />
+          <button
+            className="mobile-top-btn missions-btn"
+            onClick={() => setIsChallengesOpen(true)}
+            title="Achievements & Missions"
+          >
+            <Trophy size={15} className="text-amber-400" />
+          </button>
+
+          <button
+            className="mobile-top-btn"
+            onClick={() => setIsGuideOpen(true)}
+            title="Physics Primer Guide"
+          >
+            <HelpCircle size={15} />
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Floating Mini Telemetry HUD (tap to expand full telemetry sheet) */}
+      {telemetry && (
+        <div
+          className="mobile-mini-hud glass-panel"
+          onClick={() => setMobileSheet('telemetry')}
+          title="Tap for full Telemetry"
+        >
+          <div className="mini-hud-row">
+            <span className="mini-hud-stat text-cyan-400 font-mono">
+              {telemetry.velocity.toFixed(2)} <span className="mini-unit">km/s</span>
+            </span>
+            <span className="mini-hud-sep">•</span>
+            <span className="mini-hud-stat text-slate-300 font-mono">
+              {Math.round(telemetry.altitude).toLocaleString()} <span className="mini-unit">km alt</span>
+            </span>
+          </div>
+          <div className="mini-speed-bar">
+            <div
+              className="mini-speed-fill"
+              style={{
+                width: `${Math.min(100, (telemetry.velocity / (telemetry.vEsc || 11.2)) * 100)}%`,
+                backgroundColor: telemetry.velocity >= telemetry.vEsc ? '#f97316' : telemetry.velocity >= telemetry.vCirc ? '#10b981' : '#38bdf8'
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Quick Burn Floating Buttons (instant orbital maneuvers on phone) */}
+      <div className="mobile-quick-burns">
+        <button
+          className="mobile-burn-btn prograde"
+          onClick={() => handleApplyBurn('prograde', 0.5)}
+          title="Burn Prograde (+Δv: 0.5 km/s)"
+        >
+          <Flame size={14} />
+          <span>+Δv</span>
+        </button>
+        <button
+          className="mobile-burn-btn retrograde"
+          onClick={() => handleApplyBurn('retrograde', 0.5)}
+          title="Burn Retrograde (-Δv: 0.5 km/s)"
+        >
+          <Flame size={14} className="rotate-180" />
+          <span>-Δv</span>
+        </button>
+        <button
+          className="mobile-burn-btn circularize"
+          onClick={handleCircularize}
+          title="Circularize Orbit"
+        >
+          <RotateCw size={13} />
+          <span>Circ</span>
+        </button>
+      </div>
+
+      {/* Mobile Bottom Navigation & Playback Dock */}
+      <nav className="mobile-bottom-bar glass-panel">
+        <div className="mobile-playback-controls">
+          <button
+            className={`mobile-main-play-btn ${isPlaying ? 'playing' : 'paused'}`}
+            onClick={() => setIsPlaying(!isPlaying)}
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? <Pause size={17} /> : <Play size={17} className="translate-x-0.5" />}
+          </button>
+
+          <button
+            className="mobile-icon-btn"
+            onClick={handleStepForward}
+            disabled={isPlaying}
+            title="Step Forward"
+          >
+            <SkipForward size={15} />
+          </button>
+
+          <button
+            className="mobile-icon-btn"
+            onClick={handleReset}
+            title="Reset Simulation"
+          >
+            <RotateCcw size={15} />
+          </button>
+
+          <button
+            className="mobile-warp-pill font-mono"
+            onClick={handleCycleWarp}
+            title="Tap to cycle time speed"
+          >
+            {timeWarp}x
+          </button>
+        </div>
+
+        <div className="mobile-dock-divider"></div>
+
+        <div className="mobile-sheet-tabs">
+          <button
+            className={`mobile-sheet-tab-btn ${mobileSheet === 'controls' ? 'active' : ''}`}
+            onClick={() => setMobileSheet(mobileSheet === 'controls' ? null : 'controls')}
+            title="Presets & Thrusters"
+          >
+            <Sliders size={17} />
+            <span>Controls</span>
+          </button>
+
+          <button
+            className={`mobile-sheet-tab-btn ${mobileSheet === 'telemetry' ? 'active' : ''}`}
+            onClick={() => setMobileSheet(mobileSheet === 'telemetry' ? null : 'telemetry')}
+            title="Flight Telemetry"
+          >
+            <Activity size={17} />
+            <span>Telemetry</span>
+          </button>
+
+          <button
+            className={`mobile-sheet-tab-btn ${mobileSheet === 'energy' ? 'active' : ''}`}
+            onClick={() => setMobileSheet(mobileSheet === 'energy' ? null : 'energy')}
+            title="Energy Graph"
+          >
+            <Zap size={17} />
+            <span>Energy</span>
+          </button>
+
+          <button
+            className={`mobile-sheet-tab-btn ${mobileSheet === 'formulas' ? 'active' : ''}`}
+            onClick={() => setMobileSheet(mobileSheet === 'formulas' ? null : 'formulas')}
+            title="Physics Formulas"
+          >
+            <BookOpen size={17} />
+            <span>Formulas</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile Bottom Sheet Overlay (Drawer) */}
+      {mobileSheet && (
+        <div className="mobile-sheet-backdrop" onClick={() => setMobileSheet(null)}>
+          <div
+            className="mobile-sheet-container glass-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mobile-sheet-drag-handle">
+              <span className="drag-bar"></span>
+            </div>
+
+            <div className="mobile-sheet-header">
+              <div className="mobile-sheet-title">
+                {mobileSheet === 'controls' && <><Sliders size={17} className="text-cyan-400" /><span>Controls & Presets</span></>}
+                {mobileSheet === 'telemetry' && <><Activity size={17} className="text-cyan-400" /><span>Orbital Telemetry</span></>}
+                {mobileSheet === 'energy' && <><Zap size={17} className="text-amber-400" /><span>Energy Conservation</span></>}
+                {mobileSheet === 'formulas' && <><BookOpen size={17} className="text-cyan-400" /><span>Physics Equations Lab</span></>}
+              </div>
+              <button
+                className="mobile-sheet-close-btn"
+                onClick={() => setMobileSheet(null)}
+                title="Close Sheet"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mobile-sheet-scrollable-body">
+              {mobileSheet === 'controls' && (
+                <ControlPanel
+                  activePresetId={activePresetId}
+                  onSelectPreset={(p) => { handleSelectPreset(p); }}
+                  centralBodyConfig={centralBodyConfig}
+                  onUpdateCentralBody={setCentralBodyConfig}
+                  craftState={craftState}
+                  onApplyBurn={handleApplyBurn}
+                  onCircularize={handleCircularize}
+                  showVectors={showVectors}
+                  setShowVectors={setShowVectors}
+                  showConicPath={showConicPath}
+                  setShowConicPath={setShowConicPath}
+                  showHistoricalTrail={showHistoricalTrail}
+                  setShowHistoricalTrail={setShowHistoricalTrail}
+                  showDistanceRings={showDistanceRings}
+                  setShowDistanceRings={setShowDistanceRings}
+                  showKeplerSectors={showKeplerSectors}
+                  setShowKeplerSectors={setShowKeplerSectors}
+                  onCaptureKeplerSector={handleCaptureKeplerSector}
+                  onResetSimulation={handleReset}
+                  isSandboxMode={isSandboxMode}
+                  setIsSandboxMode={setIsSandboxMode}
+                  isMobileSheet={true}
+                />
+              )}
+
+              {mobileSheet === 'telemetry' && (
+                <TelemetryHUD
+                  telemetry={telemetry}
+                  craftMass={craftState.mass}
+                  isMobileSheet={true}
+                />
+              )}
+
+              {mobileSheet === 'energy' && (
+                <EnergyGraph
+                  telemetry={telemetry}
+                  isMobileSheet={true}
+                />
+              )}
+
+              {mobileSheet === 'formulas' && (
+                <FormulaInspector
+                  telemetry={telemetry}
+                  centralBodyConfig={centralBodyConfig}
+                  craftMass={craftState.mass}
+                  isMobileSheet={true}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Real-time Achievement Toast Notification */}
+      {achievementToast && (
+        <div
+          className="achievement-unlock-toast glass-panel"
+          onClick={() => {
+            setIsChallengesOpen(true);
+            setAchievementToast(null);
+          }}
+          title="Click to view Achievements"
+        >
+          <div className="toast-badge-wrap">
+            {achievementToast.iconUrl ? (
+              <img src={achievementToast.iconUrl} alt="Badge" className="toast-badge-img" />
+            ) : (
+              <Trophy size={22} className="text-amber-400" />
+            )}
+          </div>
+          <div className="toast-content">
+            <span className="toast-eyebrow">🏆 ACHIEVEMENT UNLOCKED!</span>
+            <span className="toast-title">{achievementToast.title}</span>
+            <span className="toast-pts">+{achievementToast.points} PTS • Tap to view</span>
+          </div>
+        </div>
+      )}
 
       {/* Student Challenges & Missions Modal */}
       <ChallengesModal
         isOpen={isChallengesOpen}
         onClose={() => setIsChallengesOpen(false)}
         telemetry={telemetry}
+        lastBurnDeltaV={lastBurnDeltaV}
+        burnCount={burnCount}
+        centralBodyId={centralBodyConfig.id}
+        onAchievementUnlocked={handleAchievementUnlocked}
       />
 
       {/* Student Guide & Orbital Physics Primer Modal */}
