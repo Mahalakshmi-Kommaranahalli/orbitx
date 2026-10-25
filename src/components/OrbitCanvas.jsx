@@ -56,12 +56,15 @@ export default function OrbitCanvas({
   // Distance rings group
   const ringsGroupRef = useRef(null);
 
-  // Mouse interaction for custom camera orbit & sandbox click-to-launch
+  // Mouse & Touch interaction refs
   const isDraggingRef = useRef(false);
   const isRightDraggingRef = useRef(false);
   const previousMousePositionRef = useRef({ x: 0, y: 0 });
   const cameraAngleRef = useRef({ theta: 0.6, phi: 0.8, radius: 28 });
   const cameraTargetRef = useRef(new THREE.Vector3(0, 0, 0));
+  const touchStartDistRef = useRef(0);
+  const touchStartRadiusRef = useRef(28);
+  const touchModeRef = useRef(null); // 'orbit' | 'pinch'
 
   // Sandbox drag-to-launch state
   const isAimingLaunchRef = useRef(false);
@@ -765,6 +768,79 @@ export default function OrbitCanvas({
     }
   };
 
+  // Touch Controls (Single-finger rotate, Two-finger pinch-to-zoom)
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      touchModeRef.current = 'orbit';
+      isDraggingRef.current = true;
+      const touch = e.touches[0];
+      previousMousePositionRef.current = { x: touch.clientX, y: touch.clientY };
+    } else if (e.touches.length === 2) {
+      touchModeRef.current = 'pinch';
+      isDraggingRef.current = false;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      touchStartDistRef.current = Math.hypot(dx, dy);
+      touchStartRadiusRef.current = cameraAngleRef.current.radius;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (touchModeRef.current === 'orbit' && e.touches.length === 1 && cameraMode === 'free') {
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - previousMousePositionRef.current.x;
+      const deltaY = touch.clientY - previousMousePositionRef.current.y;
+
+      cameraAngleRef.current.theta += deltaX * 0.009;
+      cameraAngleRef.current.phi = Math.max(0.05, Math.min(Math.PI - 0.05, cameraAngleRef.current.phi + deltaY * 0.009));
+
+      const { theta, phi, radius } = cameraAngleRef.current;
+      const cx = radius * Math.sin(phi) * Math.sin(theta);
+      const cy = radius * Math.cos(phi);
+      const cz = radius * Math.sin(phi) * Math.cos(theta);
+
+      if (cameraRef.current) {
+        cameraRef.current.position.set(cx, cy, cz);
+        cameraRef.current.lookAt(cameraTargetRef.current);
+      }
+      previousMousePositionRef.current = { x: touch.clientX, y: touch.clientY };
+    } else if (touchModeRef.current === 'pinch' && e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const currentDist = Math.hypot(dx, dy);
+
+      if (touchStartDistRef.current > 0) {
+        const scale = touchStartDistRef.current / currentDist;
+        const newRadius = Math.max(8, Math.min(180, touchStartRadiusRef.current * scale));
+        cameraAngleRef.current.radius = newRadius;
+
+        if (cameraMode === 'top_down' && cameraRef.current) {
+          cameraRef.current.position.z = newRadius;
+        } else if (cameraMode === 'free' && cameraRef.current) {
+          const { theta, phi, radius } = cameraAngleRef.current;
+          cameraRef.current.position.set(
+            radius * Math.sin(phi) * Math.sin(theta),
+            radius * Math.cos(phi),
+            radius * Math.sin(phi) * Math.cos(theta)
+          );
+          cameraRef.current.lookAt(cameraTargetRef.current);
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (e.touches.length === 0) {
+      isDraggingRef.current = false;
+      touchModeRef.current = null;
+      touchStartDistRef.current = 0;
+    } else if (e.touches.length === 1) {
+      touchModeRef.current = 'orbit';
+      isDraggingRef.current = true;
+      previousMousePositionRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
   return (
     <div
       ref={mountRef}
@@ -774,6 +850,10 @@ export default function OrbitCanvas({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* Floating Canvas Badges */}

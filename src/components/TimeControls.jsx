@@ -113,10 +113,10 @@ export default function TimeControls({
         <button
           className="action-pill-btn challenges-btn"
           onClick={onOpenChallenges}
-          title="Student Interactive Missions & Quizzes"
+          title="GitHub Achievements & Flight Academy Missions"
         >
           <Trophy size={16} className="text-amber-400" />
-          <span>Missions</span>
+          <span>Achievements</span>
         </button>
 
         <button

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BookOpen, HelpCircle, Sparkles, ChevronRight, Calculator, CheckCircle2 } from 'lucide-react';
 
-export default function FormulaInspector({ telemetry, centralBodyConfig, craftMass = 1000 }) {
+export default function FormulaInspector({ telemetry, centralBodyConfig, craftMass = 1000, isMobileSheet = false }) {
   const [selectedFormula, setSelectedFormula] = useState('gravitation');
 
   if (!telemetry) return null;
@@ -21,7 +21,7 @@ export default function FormulaInspector({ telemetry, centralBodyConfig, craftMa
   const radiusMeters = radius * 1e6;
 
   return (
-    <div className="formula-inspector-card glass-panel">
+    <div className={`formula-inspector-card ${isMobileSheet ? 'mobile-sheet-content' : 'glass-panel'}`}>
       <div className="inspector-header">
         <div className="flex items-center gap-2">
           <BookOpen size={16} className="text-cyan-400" />
